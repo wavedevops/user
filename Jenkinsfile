@@ -1,6 +1,10 @@
 pipeline {
     agent { label 'workstation' }
 
+    environment {
+        component = "user"
+    }
+
     stages {
 
         stage('Code Quality') {
@@ -10,7 +14,6 @@ pipeline {
                 }
             }
             steps {
-                // sh 'sonar-scanner -Dsonar.host.url=http://172.31.91.185:9000 -Dsonar.login=admin -Dsonar.password=admin123 -Dsonar.projectKey=backend -Dsonar.qualitygate.wait=true'
                 echo 'OK'
             }
         }
@@ -23,8 +26,6 @@ pipeline {
                 }
             }
             steps {
-                // Ideally we should run the tests, but here the developer has skipped it. So assuming those are good and proceeding
-                // sh 'npm test'
                 echo 'CI'
             }
         }
@@ -34,16 +35,26 @@ pipeline {
                 expression { env.TAG_NAME ==~ ".*" }
             }
             steps {
-                sh 'zip -r frontend-${TAG_NAME}.zip *'
-                sh 'curl -sSf -u "admin:"{{ lookup('aws_ssm', 'jenkins_password', region='us-east-1' ) }}"" -X PUT -T frontend-${TAG_NAME}.zip "https://jfrog.chaitu.net/artifactory/frontend/frontend-${TAG_NAME}.zip"'
-                //curl -uadmin:cmVmdGtuOjAxOjE3NzUxODgwOTg6SG1nN3JqeDBHcExIY0Z4NVR0UmRTVVFkM2pt -T <PATH_TO_FILE> "https://jfrog.chaitu.net/artifactory/example-repo-local/<TARGET_FILE_PATH>"
-            }
-            steps {
-//                 sh 'docker build -t 739561048503.dkr.ecr.us-east-1.amazonaws.com/frontend:${TAG_NAME} .'
-//                 sh 'aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 739561048503.dkr.ecr.us-east-1.amazonaws.com'
-//                 sh 'docker push 739561048503.dkr.ecr.us-east-1.amazonaws.com/frontend:${TAG_NAME}'
+                sh 'zip -r ${component}-${TAG_NAME}.zip *'
+                sh """
+                curl -sSf -u admin:@123Chaitu -X PUT -T ${component}-${TAG_NAME}.zip "https://jfrog.chaitu.net/artifactory/${component}/${component}-${TAG_NAME}.zip"
+                """
             }
         }
+    }
 
+    post {
+        always {
+            echo "Cleaning up workspace..."
+            deleteDir()
+        }
+
+        success {
+            script {
+                if (env.TAG_NAME ==~ ".*") {
+                    sh 'rm -rf /home/ec2-user/*'
+                }
+            }
+        }
     }
 }
